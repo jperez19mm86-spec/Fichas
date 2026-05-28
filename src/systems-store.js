@@ -9,6 +9,7 @@
  */
 const crypto = require('crypto');
 const { db } = require('./db');
+const { encrypt, decrypt, isEncrypted } = require('./crypto-util');
 
 const FILE = 'sqlite:systems'; // compat (ya no es un archivo; queda por si algo lo referencia)
 
@@ -18,7 +19,7 @@ function load() {
     name: r.name,
     url: r.url,
     user: r.user,
-    password: r.password,
+    password: decrypt(r.password), // en la base está cifrada; acá la devolvemos en claro para usarla
     createdAt: r.createdAt,
     lastLoginAt: r.lastLoginAt,
     lastLoginOk: r.lastLoginOk === null ? null : !!r.lastLoginOk,
@@ -37,7 +38,7 @@ const _saveTx = db.transaction((data) => {
     name: s.name || '',
     url: s.url || '',
     user: s.user || '',
-    password: s.password || '',
+    password: encrypt(s.password || ''), // se guarda CIFRADA en la base
     createdAt: s.createdAt || null,
     lastLoginAt: s.lastLoginAt || null,
     lastLoginOk: (s.lastLoginOk === null || s.lastLoginOk === undefined) ? null : (s.lastLoginOk ? 1 : 0),
@@ -121,4 +122,15 @@ function publicView(s) {
   };
 }
 
-module.exports = { list, get, create, update, remove, setActive, publicView, seed: save, FILE };
+/**
+ * Cifra en la base las contraseñas que estén en texto plano (legacy, ej. recién migradas del JSON).
+ * Idempotente: si ya están todas cifradas, no hace nada. Devuelve cuántas cifró.
+ */
+function migrateEncrypt() {
+  const rows = db.prepare('SELECT password FROM systems').all();
+  const plain = rows.filter((r) => r.password && !isEncrypted(r.password)).length;
+  if (plain > 0) save(load()); // load descifra (legacy=tal cual) → save vuelve a guardar cifrado
+  return plain;
+}
+
+module.exports = { list, get, create, update, remove, setActive, publicView, seed: save, migrateEncrypt, FILE };

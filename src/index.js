@@ -392,6 +392,14 @@ function migrateLegacyJson() {
 }
 migrateLegacyJson();
 
+// Cifrar en la base las contraseñas de sistemas que estén en texto plano (legacy).
+try {
+  const n = store.migrateEncrypt();
+  if (n) console.log(`[seguridad] ${n} contraseña(s) de sistemas cifradas en la base`);
+} catch (e) {
+  console.error('[seguridad] migrateEncrypt error:', e.message);
+}
+
 if (auth.USING_DEFAULT_PASSWORD) {
   console.warn('⚠️  [VentaFichas] PANEL_PASSWORD no está configurada — usando "admin" por defecto. ¡Configurá PANEL_PASSWORD (y SESSION_SECRET) en producción!');
 }
