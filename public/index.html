@@ -125,6 +125,7 @@
   <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:flex-end">
     <div class="meta" id="activeBanner">—</div>
     <button class="outline small" id="btnNotif" onclick="enableNotifications()" title="Recibir aviso cuando un cliente pide fichas">🔔 Activar avisos</button>
+    <button class="outline small" onclick="descargarBackup()" title="Descargar una copia de TODA la base (sistemas, clientes, cajas, pedidos)">⬇️ Backup</button>
     <button class="outline small" onclick="logout()" title="Cerrar sesión">🚪 Salir</button>
   </div>
 </header>
@@ -770,6 +771,25 @@
       const r = await fetch('/api/push/test', { method: 'POST' }).then((r) => r.json());
       if (r.ok) alert('Prueba enviada a ' + (r.sent || 0) + ' dispositivo(s).' + (r.removed ? ' (' + r.removed + ' vencido(s) eliminado(s))' : ''));
     } catch (e) { alert('Error: ' + e.message); }
+  }
+
+  // Descarga TODA la base en un JSON (resguardo manual, además del volume persistente).
+  async function descargarBackup() {
+    try {
+      const r = await fetch('/api/_backup').then((r) => r.json());
+      if (!r.ok || !r.dump) throw new Error(r.error || 'no se pudo generar el backup');
+      const blob = new Blob([JSON.stringify(r.dump, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const d = new Date();
+      const stamp = d.getFullYear() + ('0'+(d.getMonth()+1)).slice(-2) + ('0'+d.getDate()).slice(-2) + '-' + ('0'+d.getHours()).slice(-2) + ('0'+d.getMinutes()).slice(-2);
+      a.href = url; a.download = 'venta-fichas-backup-' + stamp + '.json';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      const ns = (r.dump.systems && r.dump.systems.systems || []).length;
+      const nc = (r.dump.clientes && r.dump.clientes.clientes || []).length;
+      alert('✅ Backup descargado: ' + ns + ' sistema(s) + ' + nc + ' cliente(s). Guardalo en un lugar seguro (contiene contraseñas).');
+    } catch (e) { alert('Error generando backup: ' + e.message); }
   }
 
   // init

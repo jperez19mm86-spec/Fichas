@@ -297,6 +297,49 @@ app.get('/api/_dbinfo', (_req, res) => {
   });
 });
 
+// ─────────────── BACKUP / RESTORE (resguardo de datos) ───────────────
+// Doble seguridad además del VOLUME: el admin puede bajarse TODA la base en un JSON y volver
+// a cargarla cuando quiera. Las contraseñas de los sistemas salen EN CLARO (descifradas) para
+// que el backup sea portable entre entornos; al restaurar se vuelven a cifrar con la CRED_KEY
+// de ESTE entorno. El archivo es sensible (tiene contraseñas) → guardalo en un lugar seguro.
+app.get('/api/_backup', (_req, res) => {
+  try {
+    const dump = {
+      version: 1,
+      app: 'venta-fichas',
+      exportedAt: new Date().toISOString(),
+      systems: store.list(),         // { activeId, systems:[... password EN CLARO ...] }
+      clientes: clientes.list(),     // { clientes:[...] }
+      pedidos: { pedidos: pedidos.list() },
+    };
+    res.json({ ok: true, dump });
+  } catch (e) { res.status(500).json({ ok: false, error: e.message }); }
+});
+
+// Restaura un dump de /api/_backup. Acepta el dump directo o { dump:{...} }.
+// SEGURIDAD: si la base NO está vacía, exige { force:true } para no pisar datos por accidente.
+app.post('/api/_restore', (req, res) => {
+  try {
+    const body = req.body || {};
+    const dump = body.dump || body;
+    const cur = {
+      systems: store.list().systems.length,
+      clientes: clientes.list().clientes.length,
+      pedidos: pedidos.list().length,
+    };
+    const noVacia = (cur.systems + cur.clientes + cur.pedidos) > 0;
+    if (noVacia && !body.force) {
+      return res.status(409).json({ ok: false, error: 'La base NO está vacía; mandá force:true para sobrescribir.', current: cur });
+    }
+    const applied = {};
+    if (dump.systems && Array.isArray(dump.systems.systems)) { store.seed(dump.systems); applied.systems = dump.systems.systems.length; }
+    if (dump.clientes && Array.isArray(dump.clientes.clientes)) { clientes.seed(dump.clientes); applied.clientes = dump.clientes.clientes.length; }
+    if (dump.pedidos && Array.isArray(dump.pedidos.pedidos)) { pedidos.seed(dump.pedidos); applied.pedidos = dump.pedidos.pedidos.length; }
+    console.log('[RESTORE] aplicado:', JSON.stringify(applied), '(antes:', JSON.stringify(cur) + ')');
+    res.json({ ok: true, applied, before: cur });
+  } catch (e) { res.status(500).json({ ok: false, error: e.message }); }
+});
+
 // ─────────────── PEDIDOS — vista cliente (por código) ───────────────
 
 // El cliente entra su código → ve sus cajas + montos rápidos para armar el pedido.

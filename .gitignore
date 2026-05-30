@@ -11,3 +11,7 @@ data/
 # Logs
 *.log
 npm-debug.log*
+
+# dumps de backup con contraseñas en claro — NUNCA commitear
+restore-dump.json
+*-backup-*.json
