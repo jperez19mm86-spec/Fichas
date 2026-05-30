@@ -282,6 +282,21 @@ app.post('/api/push/test', async (req, res) => {
   res.json({ ok: true, ...r });
 });
 
+// Diagnóstico: dónde está la base (para verificar que el VOLUME persistente esté activo).
+app.get('/api/_dbinfo', (_req, res) => {
+  const { DB_PATH } = require('./db');
+  const fs = require('fs');
+  let exists = false, sizeBytes = 0;
+  try { const st = fs.statSync(DB_PATH); exists = true; sizeBytes = st.size; } catch (e) { /* no existe aún */ }
+  res.json({
+    ok: true,
+    dbPath: DB_PATH,
+    onVolume: !!process.env.RAILWAY_VOLUME_MOUNT_PATH,
+    volumeMount: process.env.RAILWAY_VOLUME_MOUNT_PATH || null,
+    exists, sizeBytes,
+  });
+});
+
 // ─────────────── PEDIDOS — vista cliente (por código) ───────────────
 
 // El cliente entra su código → ve sus cajas + montos rápidos para armar el pedido.

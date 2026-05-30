@@ -14,8 +14,17 @@ const path = require('path');
 const fs = require('fs');
 const Database = require('better-sqlite3');
 
-const DB_PATH = process.env.DB_PATH || path.join(__dirname, '..', 'data', 'store.sqlite');
+// Dónde guardar la base, en orden de prioridad:
+//   1) DB_PATH (env) — si lo fijás a mano.
+//   2) RAILWAY_VOLUME_MOUNT_PATH — Railway inyecta el path del VOLUME montado. Usarlo garantiza
+//      que la base viva en el disco persistente SIN importar dónde se montó el volume (no se borra
+//      en los redeploys). Esta es la clave para que la data NO se pierda al actualizar.
+//   3) data/store.sqlite (local/dev).
+const DB_PATH = process.env.DB_PATH
+  || (process.env.RAILWAY_VOLUME_MOUNT_PATH ? path.join(process.env.RAILWAY_VOLUME_MOUNT_PATH, 'store.sqlite') : null)
+  || path.join(__dirname, '..', 'data', 'store.sqlite');
 fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
+console.log('[DB] base en:', DB_PATH, process.env.RAILWAY_VOLUME_MOUNT_PATH ? '(VOLUME persistente ✓)' : '(local/efímero)');
 
 const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL'); // mejor concurrencia + durabilidad
