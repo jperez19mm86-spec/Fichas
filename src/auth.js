@@ -28,6 +28,10 @@ const PUBLIC = [
   /^\/api\/pedir(\/|$)/,
   /^\/logo\.png$/,
   /^\/favicon\.ico$/,
+  // PWA: el navegador pide estos sin cookies → deben ser públicos.
+  /^\/sw\.js$/,
+  /^\/manifest\.json$/,
+  /^\/icon-[\w-]*\.png$/,
 ];
 
 function sign(value) {

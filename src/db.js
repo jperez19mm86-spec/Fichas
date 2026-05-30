@@ -55,6 +55,11 @@ db.exec(`
     key   TEXT PRIMARY KEY,
     value TEXT
   );
+  CREATE TABLE IF NOT EXISTS push_subs (
+    endpoint  TEXT PRIMARY KEY,   -- endpoint de la suscripción (único por navegador/dispositivo)
+    sub       TEXT,               -- JSON de la PushSubscription completa
+    createdAt TEXT
+  );
 `);
 
 module.exports = { db, DB_PATH };

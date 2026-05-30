@@ -20,6 +20,7 @@ const clientes = require('./clientes-store');
 const pedidos = require('./pedidos-store');
 const config = require('./config-store');
 const telegram = require('./telegram');
+const push = require('./push');
 const auth = require('./auth');
 
 const PORT = parseInt(process.env.PORT || '4600', 10);
@@ -259,6 +260,28 @@ app.post('/api/clientes/:id/telegram/test', async (req, res) => {
   res.json(r.ok ? { ok: true } : { ok: false, error: r.error });
 });
 
+// ─────────────── PUSH (notificaciones al admin) ───────────────
+// El panel (logueado) pide la VAPID public key, se suscribe, y prueba.
+app.get('/api/push/vapid-key', (_req, res) => {
+  try { res.json({ ok: true, publicKey: push.getPublicKey() }); }
+  catch (e) { res.status(500).json({ ok: false, error: e.message }); }
+});
+app.post('/api/push/subscribe', (req, res) => {
+  const sub = (req.body && req.body.subscription) || req.body;
+  if (!sub || !sub.endpoint) return res.status(400).json({ ok: false, error: 'falta la suscripción' });
+  push.addSubscription(sub);
+  res.json({ ok: true, count: push.count() });
+});
+app.post('/api/push/unsubscribe', (req, res) => {
+  const ep = (req.body && (req.body.endpoint || (req.body.subscription && req.body.subscription.endpoint)));
+  if (ep) push.removeSubscription(ep);
+  res.json({ ok: true, count: push.count() });
+});
+app.post('/api/push/test', async (req, res) => {
+  const r = await push.sendToAll({ title: '🔔 Prueba — Latam Games', body: 'Las notificaciones están activas ✅', url: '/' });
+  res.json({ ok: true, ...r });
+});
+
 // ─────────────── PEDIDOS — vista cliente (por código) ───────────────
 
 // El cliente entra su código → ve sus cajas + montos rápidos para armar el pedido.
@@ -290,6 +313,8 @@ app.post('/api/pedir', (req, res) => {
     divisa: div, monto: m,
   });
   console.log(`[Pedido] nuevo: ${cli.codigo}/${cli.nombreVisible} → ${caja.usuario} (${caja.sistema}) ${div} $${m}`);
+  // PUSH al admin: "Usuario X pidió $monto en MONEDA" (fire-and-forget, no bloquea la respuesta al cliente).
+  push.notifyNewPedido(pedido);
   res.json({ ok: true, pedido: { id: pedido.id, cajaUsuario: pedido.cajaUsuario, divisa: pedido.divisa, monto: pedido.monto, estado: pedido.estado } });
 });
 

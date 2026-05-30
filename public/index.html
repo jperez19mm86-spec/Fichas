@@ -3,7 +3,12 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Venta de Fichas — Sistemas</title>
+<title>Latam Games — Panel</title>
+<link rel="manifest" href="/manifest.json" />
+<meta name="theme-color" content="#c456ad" />
+<link rel="apple-touch-icon" href="/icon-192.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-title" content="Latam Games" />
 <style>
   :root {
     --bg: #fbf4fa; --bg2: #ffffff; --bg3: #f6e9f4; --border: #ead6e6;
@@ -119,6 +124,7 @@
   <h1>🎰 Venta de Fichas <span class="sub">— panel de sistemas</span></h1>
   <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:flex-end">
     <div class="meta" id="activeBanner">—</div>
+    <button class="outline small" id="btnNotif" onclick="enableNotifications()" title="Recibir aviso cuando un cliente pide fichas">🔔 Activar avisos</button>
     <button class="outline small" onclick="logout()" title="Cerrar sesión">🚪 Salir</button>
   </div>
 </header>
@@ -717,11 +723,61 @@
     fetch('/api/logout', { method: 'POST' }).finally(function () { window.location.href = '/login'; });
   }
 
+  // ─── PWA + Push (avisos al admin cuando un cliente pide fichas) ───
+  function urlBase64ToUint8Array(b64) {
+    const pad = '='.repeat((4 - b64.length % 4) % 4);
+    const s = (b64 + pad).replace(/-/g, '+').replace(/_/g, '/');
+    const raw = atob(s); const arr = new Uint8Array(raw.length);
+    for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+    return arr;
+  }
+  let _swReg = null;
+  async function registerSW() {
+    if (!('serviceWorker' in navigator)) return null;
+    try { _swReg = await navigator.serviceWorker.register('/sw.js'); return _swReg; }
+    catch (e) { console.warn('SW register fail', e); return null; }
+  }
+  async function refreshNotifButton() {
+    const btn = document.getElementById('btnNotif');
+    if (!btn) return;
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) { btn.style.display = 'none'; return; }
+    try {
+      const reg = _swReg || await navigator.serviceWorker.ready;
+      const sub = reg && await reg.pushManager.getSubscription();
+      if (sub && Notification.permission === 'granted') {
+        btn.textContent = '🔔 Avisos activos'; btn.title = 'Tocá para enviar una prueba'; btn.onclick = testNotification;
+      } else {
+        btn.textContent = '🔔 Activar avisos'; btn.onclick = enableNotifications;
+      }
+    } catch (e) { /* noop */ }
+  }
+  async function enableNotifications() {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) { alert('Este navegador no soporta notificaciones push.'); return; }
+    try {
+      const perm = await Notification.requestPermission();
+      if (perm !== 'granted') { alert('Permiso denegado. Activá las notificaciones para este sitio en los ajustes del navegador.'); return; }
+      const reg = _swReg || (await registerSW()) || (await navigator.serviceWorker.ready);
+      const kr = await fetch('/api/push/vapid-key').then((r) => r.json());
+      if (!kr.ok || !kr.publicKey) throw new Error('no se pudo obtener la clave del servidor');
+      const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(kr.publicKey) });
+      const r = await fetch('/api/push/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscription: sub }) }).then((r) => r.json());
+      if (r.ok) { alert('✅ Avisos activados en este dispositivo. Te va a llegar una notificación cada vez que un cliente pida fichas.'); refreshNotifButton(); }
+      else alert('No se pudo registrar el dispositivo: ' + (r.error || ''));
+    } catch (e) { alert('Error activando avisos: ' + e.message); }
+  }
+  async function testNotification() {
+    try {
+      const r = await fetch('/api/push/test', { method: 'POST' }).then((r) => r.json());
+      if (r.ok) alert('Prueba enviada a ' + (r.sent || 0) + ' dispositivo(s).' + (r.removed ? ' (' + r.removed + ' vencido(s) eliminado(s))' : ''));
+    } catch (e) { alert('Error: ' + e.message); }
+  }
+
   // init
   loadSystems();          // datos de sistemas + banner del header
   switchView('pedidos');  // SIEMPRE arranca en Pedidos al entrar a la página (fuerza la vista + carga la lista)
   refreshPedBadge();
   setInterval(refreshPedBadge, 20000); // refrescar contador de pedidos pendientes
+  registerSW().then(refreshNotifButton); // PWA + estado del botón de avisos
 </script>
 </body>
 </html>
