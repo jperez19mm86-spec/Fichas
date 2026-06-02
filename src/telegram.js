@@ -27,10 +27,8 @@ async function sendMessage(botToken, chatId, text) {
 function cargaText({ clienteNombre, codigo, cajaUsuario, divisa, monto }) {
   const m = Number(monto).toLocaleString('es-AR');
   return `✅ <b>Carga acreditada</b>\n\n` +
-    `👤 ${escapeHtml(clienteNombre || '')} (${escapeHtml(codigo || '')})\n` +
     `🎰 Usuario: <b>${escapeHtml(cajaUsuario || '')}</b>\n` +
-    `💰 Monto: <b>${escapeHtml(divisa || '')} $ ${m}</b>\n\n` +
-    `<i>Latam Games</i>`;
+    `💰 Monto: <b>${escapeHtml(divisa || '')} $ ${m}</b>`;
 }
 
 function escapeHtml(s) { return String(s == null ? '' : s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])); }
