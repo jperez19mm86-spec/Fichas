@@ -25,11 +25,13 @@ function logTransaction(pedido) {
       secret: SHEET_SECRET,
       tz: TZ,
       id: pedido.id || '',
-      fecha: pedido.resueltoAt || pedido.createdAt || new Date().toISOString(),
+      fecha: pedido.resueltoAt || pedido.createdAt || new Date().toISOString(), // cuándo se resolvió
+      pedidoAt: pedido.createdAt || '',                                          // cuándo lo pidió el cliente
       estado: pedido.estado || '',
-      cliente: pedido.clienteNombre || '',
+      cliente: pedido.clienteNombre || pedido.codigo || '',                      // nombre; si falta → código
       codigo: pedido.codigo || '',
       cajaUsuario: pedido.cajaUsuario || '',
+      usuarioId: pedido.userId || '',                                            // ID de la cuenta en el casino
       sistema: pedido.sistema || '',
       monto: Number(pedido.monto) || 0,
       divisa: pedido.divisa || '',
