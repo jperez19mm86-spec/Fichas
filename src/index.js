@@ -20,6 +20,7 @@ const clientes = require('./clientes-store');
 const pedidos = require('./pedidos-store');
 const config = require('./config-store');
 const telegram = require('./telegram');
+const sheets = require('./sheets');
 const push = require('./push');
 const auth = require('./auth');
 
@@ -403,6 +404,7 @@ app.post('/api/pedidos/:id/cargar', async (req, res) => {
     if (r.ok) {
       const upd = pedidos.setEstado(p.id, 'cargado', { newBalance: r.newBalance, error: null });
       console.log(`[Pedido] CARGADO ${p.codigo}→${p.cajaUsuario} ${p.divisa} $${p.monto} (nuevo balance: ${r.newBalance})`);
+      sheets.logTransaction(upd); // registro en Google Sheets (fire-and-forget, no bloquea)
       // Aviso por Telegram al grupo del cliente (si está configurado) — fire-and-forget, no bloquea.
       try {
         const cli = clientes.getByCodigo(p.codigo);
@@ -428,6 +430,7 @@ app.post('/api/pedidos/:id/rechazar', (req, res) => {
   if (!p) return res.status(404).json({ ok: false, error: 'pedido no encontrado' });
   if (p.estado !== 'pendiente') return res.status(400).json({ ok: false, error: `el pedido ya está "${p.estado}"` });
   const upd = pedidos.setEstado(p.id, 'rechazado', { error: (req.body && req.body.motivo) || null });
+  sheets.logTransaction(upd); // registro en Google Sheets (fire-and-forget, no bloquea)
   res.json({ ok: true, pedido: upd });
 });
 
